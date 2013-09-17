@@ -1,39 +1,4 @@
-argv = require('optimist')
-    .usage 'Configure your xBee.\nUsage: $0',
-      'help':
-        description:'Show this help message'
-        boolean: true
-        alias: 'h'
-      'list':
-        description: 'List the serial ports attached to your system'
-        boolean: true
-        alias: 'l'
-      'port':
-        description: 'Specify the serial port for your xBee device.'
-        alias: 'p'
-      'describe':
-        description: 'Describe the connected xBee device.'
-        alias: 'd'
-        boolean: true
-    .check( (argv)->
-      if argv.help || (!argv.list && !argv.port)
-        return false
-      return true
-    )
-    .argv
-
-async = require 'async'
-
-serialport = require("serialport")
-SerialPort = serialport.SerialPort
-
-if argv.list
-  serialport.list (err, ports) ->
-    ports.forEach (port) ->
-      console.log 'Port: ' + port.comName
-
-
-describeCommands = [
+module.exports = [
   {
     name:'Channel',
     command: 'CH',
@@ -123,7 +88,8 @@ describeCommands = [
     name: "Coordinator Enable",
     catagory: "Networking",
     description: "Set/Read the coordinator setting. A value of 0 makes it an End Device but a value of 1 makes it a Coordinator.",
-    range: "0 = End Device, 1 = Coordinator", "0" ],
+    range: "0 = End Device, 1 = Coordinator",
+    default: "0"
   },{
     command: "SC",
     name: "Scan Channels",
@@ -140,66 +106,3 @@ describeCommands = [
     default: "0"
   }
 ]
-
-port = argv.port
-if port
-  baudrate = 19200
-  serial = new SerialPort port,
-    baudrate: baudrate
-
-  serial.on "open", () ->
-    console.log('Serial Port Open.\n')
-
-    if argv.describe
-      connect serial, () ->
-        async.forEachSeries describeCommands,
-          (command, callback) ->
-            readCommand(serial, command.command, command.name, callback)
-          , (err) ->
-            if err
-              console.log 'Error! ' + err
-            console.log('done')
-
-
-print = (name, value) ->
-  console.log name + (' ' for x in [15..(name.length)]).join('') + ': ' + value
-
-read = (serial, command, callbacks) ->
-  serial.write command, (err, results) ->
-    if err
-      console.log 'err ' + err
-      console.log 'results ' + results
-      callbacks.error(err)
-    serial.once 'data', callbacks.success
-
-connect = (serial, callback) ->
-  read serial, '+++',
-    error: callback
-    success: (data) ->
-      print 'Connected', data
-      setTimeout callback, 1100
-
-readChannel = (serial, callback) ->
-  read serial, 'ATCH\r\n',
-    error: callback
-    success: (data) ->
-      print 'Channel', data
-      callback()
-
-readPanId = (serial, callback) ->
-  read serial, 'ATID\r\n',
-    error: callback
-    success: (data) ->
-      print 'Pan Id', data
-      callback()
-
-readCommand = (serial, command, name, callback) ->
-  read serial, 'AT' + command + '\r\n',
-    error: callback
-    success: (data) ->
-      print name, data
-      callback()
-
-
-
-
